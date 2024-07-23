@@ -4,8 +4,8 @@ import pandas as pd
 import cv2
 import argparse
 
-SIZE = "size03"  # Change survey name here (only alters output file name) | Options: "size00", s"ize01", "size02" or "size03"
-MODEL = "outdoor"  # Change name model here | Options: "indoor" or "outdoor" | Changes column names
+SIZE = "size02"  # Change survey name here (only alters output file name) | Options: "size00", s"ize01", "size02" or "size03"
+MODEL = "indoor"  # Change name model here | Options: "indoor" or "outdoor" | Changes column names
 CAMERA = "left"  # Change camera here | Options: "left" or "right" | This will adjust which camera focal length will be used
 
 
@@ -56,7 +56,7 @@ def calculate_length(dmap, point1, point2, focal_length, zmin, zmax):
 
     # This is the real-world depth value at the midpoint, calculated by scaling depth_value using zmin and zmax.
     value_metric = (depth_value * (zmax - zmin)) + zmin
-
+    # range_via_parameters
     # This is the length of the line segment connecting point1 and point2 in real-world units (meters), calculated by converting length_pixels to real-world distance using value_metric and focal_length.
     length_metric = (value_metric * length_pixels) / focal_length
 
@@ -144,7 +144,11 @@ def main(input_dir, output_dir, csv_file_path):
     results = []
 
     for _, row in metadata.iterrows():
-        deployment_code = int(row["deployment-code"])
+        deployment_code_raw = row["deployment-code"]
+        try:
+            deployment_code = int(deployment_code_raw)
+        except ValueError:
+            deployment_code = str(deployment_code_raw)
         camera = row["camera"]
         frame = int(row["frame"])
         calibration_id = row["calibration-id"]
