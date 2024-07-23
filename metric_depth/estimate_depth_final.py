@@ -1,3 +1,31 @@
+"""
+Summary:
+---------
+The script reads images from an input directory, extracts depth information using a depth estimation model, and saves the processed images and depth maps to an output directory.
+It retrieves focal length values from a CSV file and uses these values during the depth estimation process.
+The script handles errors related to file reading and model processing.
+
+Functions:
+----------
+- process_images(model, focal_length_df):
+    Processes images using the specified depth estimation model. It reads the focal length from the CSV file, applies the model to each image, and saves the depth maps and point clouds to the output directory.
+
+- main(model_name, pretrained_resource, focal_length_file, input_dir, output_dir):
+    Main function that sets up the model and processes images using the specified parameters.
+
+Example usage:
+--------------
+python script.py -m zoedepth -p local::./checkpoints/depth_anything_metric_depth_outdoor.pt -f path/to/focal_lengths.csv -i path/to/input/images -o path/to/output/images
+
+Args:
+-----
+-m, --model: Name of the model to test. (optional)
+-p, --pretrained_resource: Pretrained resource to use for fetching weights. (optional)
+-f, --focal_length_file: CSV file containing the focal length.
+-i, --input_dir: Directory containing input images.
+-o, --output_dir: Directory to save output images.
+"""
+
 import argparse
 import os
 import glob
@@ -15,13 +43,21 @@ from zoedepth.utils.misc import colorize
 # Global settings
 FY = 1109
 FX = 1109
-NYU_DATA = False
+NYU_DATA = True
 FINAL_HEIGHT = 1080
 FINAL_WIDTH = 1920
 DATASET = "nyu"  # Let's not pick a fight with the model's dataloader
 
 
 def process_images(model, focal_length_df):
+    """
+    Processes images using the specified depth estimation model. It reads the focal length from the CSV file,
+    applies the model to each image, and saves the depth maps and point clouds to the output directory.
+
+    Args:
+        model: The depth estimation model.
+        focal_length_df (pd.DataFrame): DataFrame containing focal length data.
+    """
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
 
@@ -73,6 +109,8 @@ def process_images(model, focal_length_df):
                 )
 
                 focal_length_x, focal_length_y = (FX, FY) if not NYU_DATA else (FL, FL)
+                # If NYU_DATA is False, use FX for focal_length_x and FY for focal_length_y.
+                # If NYU_DATA is True, use FL for both focal_length_x and focal_length_y.
                 x, y = np.meshgrid(np.arange(FINAL_WIDTH), np.arange(FINAL_HEIGHT))
                 x = (x - FINAL_WIDTH / 2) / focal_length_x
                 y = (y - FINAL_HEIGHT / 2) / focal_length_y
@@ -81,30 +119,30 @@ def process_images(model, focal_length_df):
                     (np.multiply(x, z), np.multiply(y, z), z), axis=-1
                 ).reshape(-1, 3)
 
-                Image.fromarray(predm).convert("L").save(
-                    os.path.join(
-                        OUTPUT_DIR,
-                        os.path.splitext(os.path.basename(image_path))[0]
-                        + "_pred01.png",
-                    )
-                )
-                p = colorize(pred.squeeze().detach().cpu().numpy(), cmap="magma_r")
-                Image.fromarray(p).save(
-                    os.path.join(
-                        OUTPUT_DIR,
-                        os.path.splitext(os.path.basename(image_path))[0]
-                        + "_pred02.png",
-                    )
-                )
-
-                pm = colorize(z, cmap="magma_r")
-                Image.fromarray(pm).save(
-                    os.path.join(
-                        OUTPUT_DIR,
-                        os.path.splitext(os.path.basename(image_path))[0]
-                        + "_pred03.png",
-                    )
-                )
+                #                Image.fromarray(predm).convert("L").save(
+                #                    os.path.join(
+                #                        OUTPUT_DIR,
+                #                        os.path.splitext(os.path.basename(image_path))[0]
+                #                        + "_pred01.png",
+                #                    )
+                #                )
+                #                p = colorize(pred.squeeze().detach().cpu().numpy(), cmap="magma_r")
+                #                Image.fromarray(p).save(
+                #                    os.path.join(
+                #                        OUTPUT_DIR,
+                #                        os.path.splitext(os.path.basename(image_path))[0]
+                #                        + "_pred02.png",
+                #                    )
+                #                )
+                #
+                #                pm = colorize(z, cmap="magma_r")
+                #                Image.fromarray(pm).save(
+                #                    os.path.join(
+                #                        OUTPUT_DIR,
+                #                        os.path.splitext(os.path.basename(image_path))[0]
+                #                        + "_pred03.png",
+                #                    )
+                #                )
 
                 z_norm = (z - z.min()) / (z.max() - z.min())
                 imgdepth = o3d.geometry.Image((z_norm * 255).astype(np.uint8))
@@ -116,12 +154,22 @@ def process_images(model, focal_length_df):
                     ),
                     imgdepth,
                 )
-                print(z.min(), z.max())
+                print(z.min(), z.max())  # Print z-min and z-max
         except Exception as e:
             print(f"Error processing {image_path}: {e}")
 
 
 def main(model_name, pretrained_resource, focal_length_file, input_dir, output_dir):
+    """
+    Main function that sets up the model and processes images using the specified parameters.
+
+    Args:
+        model_name (str): Name of the model to test.
+        pretrained_resource (str): Pretrained resource to use for fetching weights.
+        focal_length_file (str): CSV file containing the focal length.
+        input_dir (str): Directory containing input images.
+        output_dir (str): Directory to save output images.
+    """
     global INPUT_DIR, OUTPUT_DIR
 
     # Read focal length from CSV
@@ -179,3 +227,7 @@ if __name__ == "__main__":
         args.input_dir,
         args.output_dir,
     )
+
+# Example Code:
+# cd to metric_depth dir then:
+# python3 estimate_depth_final.py -f /home/shakyafernando/projects/monocular-depth/home/ubuntu/stereo-app-tnc/data/sizes00.csv -i /home/shakyafernando/projects/monocular-depth/frames/predictions/input/ -o /home/shakyafernando/projects/monocular-depth/frames/predictions/output/
